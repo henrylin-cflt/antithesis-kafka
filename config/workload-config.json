@@ -47,5 +47,6 @@
     "consumer_group_member_process_delay_ms": {
         "min": 0,
         "max": 200
-    }
+    },
+    "enable_transactions": true
 }

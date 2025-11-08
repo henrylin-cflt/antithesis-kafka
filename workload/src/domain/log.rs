@@ -73,6 +73,12 @@ pub enum TestEvent {
     MessageReadSucceeded(MessageReadSucceeded),
     MessageWriteFailed(MessageWriteFailed),
     MessageWriteSucceeded(MessageWriteSucceeded),
+    TransactionBegun(TransactionBegun),
+    TransactionBeginFailed(TransactionBeginFailed),
+    TransactionAborted(TransactionAborted),
+    TransactionAbortFailed(TransactionAbortFailed),
+    TransactionCommitted(TransactionCommitted),
+    TransactionCommitFailed(TransactionCommitFailed),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -235,4 +241,57 @@ pub struct MessageWriteSucceeded {
     pub producer: ProducerMetadata,
     #[serde(flatten)]
     pub message: Message,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionBegun {
+    #[serde(flatten)]
+    pub producer: ProducerMetadata,
+    pub topic_name: TopicName,
+    pub sequence_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionBeginFailed {
+    #[serde(flatten)]
+    pub producer: ProducerMetadata,
+    pub topic_name: TopicName,
+    pub sequence_name: String,
+    pub error: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionAborted {
+    #[serde(flatten)]
+    pub producer: ProducerMetadata,
+    pub topic_name: TopicName,
+    pub sequence_name: String,
+    pub messages_sent: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionAbortFailed {
+    #[serde(flatten)]
+    pub producer: ProducerMetadata,
+    pub topic_name: TopicName,
+    pub sequence_name: String,
+    pub error: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionCommitted {
+    #[serde(flatten)]
+    pub producer: ProducerMetadata,
+    pub topic_name: TopicName,
+    pub sequence_name: String,
+    pub messages_sent: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionCommitFailed {
+    #[serde(flatten)]
+    pub producer: ProducerMetadata,
+    pub topic_name: TopicName,
+    pub sequence_name: String,
+    pub error: String,
 }

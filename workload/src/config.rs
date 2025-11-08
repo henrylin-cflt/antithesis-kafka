@@ -51,7 +51,9 @@ pub struct WorkloadConfig {
     pub consumer_group_members_count: U64Range,
     pub consumer_group_member_startup_delay_ms: U64Range,
     pub consumer_group_member_process_delay_ms: U64Range,
-    pub consumer_isolation_level: String
+    pub consumer_isolation_level: String,
+    #[serde(default)]
+    pub enable_transactions: bool,
 }
 
 impl WorkloadConfig {
