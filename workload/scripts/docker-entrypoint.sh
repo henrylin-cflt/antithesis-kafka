@@ -11,11 +11,11 @@ sleep 5
 
 echo "starting workload loop"
 
-for i in $(seq 1 10); do
+for i in $(seq 1 100); do
     echo "starting workload ${i}"
     ./workload workload-config.json &
     # limit parallel jobs
-    sleep 2
+    sleep 100
 done&
 
 while true

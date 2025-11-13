@@ -3,7 +3,7 @@
     "enable_debug": false,
     "is_strict": true,
     "log_dir": "logs",
-    "consumer_isolation_level": "read_uncommitted",
+    "consumer_isolation_level": "read_committed",
     "topic_count": {
         "min": 2,
         "max": 10
