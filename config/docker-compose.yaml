@@ -21,6 +21,7 @@ services:
       KAFKA_CFG_NUM_PARTITIONS: 10
       KAFKA_CFG_MIN_INSYNC_REPLICAS: 3
       JAVA_DEBUG_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n"
+    restart: always
     ports:
       - 9092:9093
     networks: 
@@ -51,6 +52,7 @@ services:
       KAFKA_CFG_LOG4J_ROOT_LOGLEVEL: WARN
       KAFKA_CFG_LOG4J_LOGGERS: org.apache.kafka=WARN,kafka=WARN,kafka.cluster=WARN,kafka.controller=WARN,kafka.coordinator=WARN,kafka.log=WARN,kafka.server=WARN,kafka.zookeeper=WARN,state.change.logger=WARN,kafka.coordinator.group.GroupCoordinator=WARN,kafka.coordinator.group.GroupMetadataManager=WARN
       JAVA_DEBUG_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n"
+    restart: always
     ports:
       - 9093:9093
     networks:
@@ -83,6 +85,7 @@ services:
       KAFKA_CFG_LOG4J_ROOT_LOGLEVEL: WARN
       KAFKA_CFG_LOG4J_LOGGERS: org.apache.kafka=WARN,kafka=WARN,kafka.cluster=WARN,kafka.controller=WARN,kafka.coordinator=WARN,kafka.log=WARN,kafka.server=WARN,kafka.zookeeper=WARN,state.change.logger=WARN,kafka.coordinator.group.GroupCoordinator=WARN,kafka.coordinator.group.GroupMetadataManager=WARN
       JAVA_DEBUG_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n"
+    restart: always
     ports:
       - 9094:9093
     networks:
