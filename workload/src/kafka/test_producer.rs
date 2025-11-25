@@ -34,8 +34,8 @@ impl TestProducer {
             .set("client.id", id)
             .set("bootstrap.servers", &config.bootstrap_servers)
             // no timeout; will continue retrying
-            .set("message.timeout.ms", "10000")
-            .set("transaction.timeout.ms", "3000")
+            .set("message.timeout.ms", "3000")
+            .set("transaction.timeout.ms", "5000")
             .set("request.required.acks", "all")
             .set("enable.idempotence", "true");
 
@@ -191,7 +191,7 @@ impl TestProducer {
                 };
                 match self
                     .inner_producer
-                    .send(record, Timeout::After(Duration::from_millis(3500)))
+                    .send(record, Timeout::After(Duration::from_millis(2000)))
                     .await
                 {
                     Ok((partition, offset)) => {
@@ -314,7 +314,7 @@ impl TestProducer {
                     }
             }
         }
-    }
+    }}
 
     async fn produce_sequence_without_transaction(
         &self,
