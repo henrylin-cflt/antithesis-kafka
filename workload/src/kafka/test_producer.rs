@@ -35,6 +35,7 @@ impl TestProducer {
             .set("bootstrap.servers", &config.bootstrap_servers)
             // no timeout; will continue retrying
             .set("message.timeout.ms", "10000")
+            .set("transaction.timeout.ms", "3000")
             .set("request.required.acks", "all")
             .set("enable.idempotence", "true");
 
@@ -54,7 +55,7 @@ impl TestProducer {
         // Initialize transactions only if enabled
         if config.enable_transactions {
             inner_producer
-                .init_transactions(Timeout::After(Duration::from_millis(3500)))
+                .init_transactions(Timeout::After(Duration::from_millis(2500)))
                 .context("failed to initialize transactions")?;
         }
         
@@ -221,78 +222,96 @@ impl TestProducer {
         let should_abort = rng::u64_in(1, 100) <= 30;
         
         if should_abort {
-            match self.inner_producer.abort_transaction(Timeout::After(Duration::from_millis(500))) {
-                Ok(_) => {
-                    warn!(
-                        timestamp = chrono::Utc::now()
-                            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-                        event = "transaction_aborted",
-                        producer_id = self.id,
-                        topic_name = topic,
-                        sequence_name = sequence_name,
-                        messages_sent = messages_sent,
-                    );
-                    // Don't log message_write_succeeded for aborted transactions
-                    // These messages were never actually written to Kafka
+            // Option 1: Retry loop with short timeouts
+            loop {
+                match self.inner_producer.abort_transaction(Timeout::After(Duration::from_millis(1000))) {
+                    Ok(_) => {
+                        warn!(
+                            timestamp = chrono::Utc::now()
+                                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                            event = "transaction_aborted",
+                            producer_id = self.id,
+                            topic_name = topic,
+                            sequence_name = sequence_name,
+                            messages_sent = messages_sent,
+                        );
+                        // Don't log message_write_succeeded for aborted transactions
+                        // These messages were never actually written to Kafka
+                        break;
+                    }
+                    Err(e) => {
+                        let error_str = e.to_string();
+                        if error_str.contains("Timed out") || error_str.contains("retry call to resume") {
+                            continue;
+                        } else {
+                            error!(
+                                timestamp = chrono::Utc::now()
+                                    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                                event = "transaction_abort_failed",
+                                producer_id = self.id,
+                                topic_name = topic,
+                                sequence_name = sequence_name,
+                                error = format!("{:#}", e).as_str(),
+                            );
+                        break;
+                    }
                 }
-                Err(err) => {
-                    error!(
-                        timestamp = chrono::Utc::now()
-                            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-                        event = "transaction_abort_failed",
-                        producer_id = self.id,
-                        topic_name = topic,
-                        sequence_name = sequence_name,
-                        error = format!("{:#}", err).as_str(),
-                    );
-                }
-            }
+            }} 
         } else {
-            match self.inner_producer.commit_transaction(Timeout::After(Duration::from_millis(500))) {
-                Ok(_) => {
-                    // Now that transaction is committed, log all messages as successfully written
-                    for (partition, offset, payload, msg_key) in pending_messages {
-                        let mut global_state = self.global_state.write().unwrap();
-                        global_state
-                            .topic_partition_offsets
-                            .entry(topic.to_string())
-                            .or_default()
-                            .insert(partition, offset);
+            loop {
+                match self.inner_producer.commit_transaction(Timeout::After(Duration::from_millis(1000))) {
+                    Ok(_) => {
+                        // Now that transaction is committed, log all messages as successfully written
+                        for (partition, offset, payload, msg_key) in pending_messages {
+                            let mut global_state = self.global_state.write().unwrap();
+                            global_state
+                                .topic_partition_offsets
+                                .entry(topic.to_string())
+                                .or_default()
+                                .insert(partition, offset);
+                            info!(
+                                timestamp = chrono::Utc::now()
+                                    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                                event = "message_write_succeeded",
+                                producer_id = self.id,
+                                topic_name = topic,
+                                topic_partition = partition,
+                                topic_partition_offset = offset,
+                                message_key = msg_key,
+                                message_payload = payload,
+                            );
+                        }
                         info!(
                             timestamp = chrono::Utc::now()
                                 .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-                            event = "message_write_succeeded",
+                            event = "transaction_committed",
                             producer_id = self.id,
                             topic_name = topic,
-                            topic_partition = partition,
-                            topic_partition_offset = offset,
-                            message_key = msg_key,
-                            message_payload = payload,
+                            sequence_name = sequence_name,
+                            messages_sent = messages_sent,
                         );
+                        break;
                     }
-                    info!(
-                        timestamp = chrono::Utc::now()
-                            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-                        event = "transaction_committed",
-                        producer_id = self.id,
-                        topic_name = topic,
-                        sequence_name = sequence_name,
-                        messages_sent = messages_sent,
-                    );
-                }
-                Err(err) => {
-                    error!(
-                        timestamp = chrono::Utc::now()
-                            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-                        event = "transaction_commit_failed",
-                        producer_id = self.id,
-                        topic_name = topic,
-                        sequence_name = sequence_name,
-                        error = format!("{:#}", err).as_str(),
-                    );
-                    // If commit fails, don't log messages as written
-                    // The transaction was aborted by Kafka
-                }
+                    Err(e) => {
+                        let error_str = e.to_string();
+                        if error_str.contains("Timed out") || error_str.contains("retry call to resume") {
+                            continue;
+                        } else {
+                        // Other error
+                            error!(
+                                timestamp = chrono::Utc::now()
+                                    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                                event = "transaction_commit_failed",
+                                producer_id = self.id,
+                                topic_name = topic,
+                                sequence_name = sequence_name,
+                                error = format!("{:#}", e).as_str(),
+                            );
+                            // If commit fails, don't log messages as written
+                            // The transaction was aborted by Kafka
+                            break;
+                        }
+                    }
             }
         }
     }
