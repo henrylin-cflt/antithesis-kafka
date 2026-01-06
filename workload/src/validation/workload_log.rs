@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tracing::debug;
-use uuid::Uuid;
+// use uuid::Uuid;
 
 use crate::domain::{TestEvent, TestLogLine, ValidationFailure};
 
@@ -21,7 +21,7 @@ struct WorkloadState {
 
 pub struct WorkloadLog {
     workload_log_filename: PathBuf,
-    workload_id: Uuid,
+    workload_id: String,
     line_index: u64,
     log_validator: LogValidator,
 }
@@ -33,12 +33,11 @@ impl WorkloadLog {
     ) -> Result<WorkloadLog> {
         let workload_id = workload_log_filename
             .as_ref()
-            .file_name()
+            .file_stem()
             .and_then(|p| p.to_str())
-            .and_then(|p| p.strip_prefix("kafka-workload-"))
-            .and_then(|p| p.strip_suffix(".log"))
-            .and_then(|p| Uuid::parse_str(p).ok())
-            .context("workload log files must be named 'kafka-workload-<UUID>.log'")?;
+            .ok_or_else(|| anyhow!("invalid workload log filename"))?
+            .to_string();
+
         let mut workload_log = WorkloadLog {
             workload_log_filename: workload_log_filename.as_ref().to_path_buf(),
             workload_id,
@@ -94,7 +93,7 @@ impl WorkloadLog {
     }
     pub fn validate(
         mut self,
-    ) -> Result<(Uuid, u64, BTreeMap<&'static str, Vec<ValidationFailure>>, bool)> {
+    ) -> Result<(String, u64, BTreeMap<&'static str, Vec<ValidationFailure>>, bool)> {
         let workload_log_file =
             File::open(&self.workload_log_filename).context("failed to open workload log file")?;
         let mut lines = BufReader::new(workload_log_file)
@@ -102,11 +101,20 @@ impl WorkloadLog {
             .skip((self.line_index - 1) as usize);
         let mut workload_ended = false;
         while let Some(Ok(line)) = lines.next() {
+            let data = match serde_json::from_str(&line) {
+                Ok(data) => data,
+                Err(err) => {
+                    debug!("Skipping invalid JSON at line {}: {}", self.line_index, err);
+                    self.line_index += 1;
+                    continue;
+                }
+            };
+            
             let log = TestLogLine {
                 line: self.line_index,
-                data: serde_json::from_str(&line)
-                    .unwrap_or_else(|err| panic!("failed to parse line {}: {}", self.line_index, err)),
+                data,
             };
+            
             self.log_validator.validate_event(&log);
             if let TestEvent::WorkloadEnded = log.data.fields {
                 workload_ended = true;

@@ -97,16 +97,30 @@ services:
     depends_on:
       - kafka-2
   workload:
-    image: antithesis-kafka-workload:latest
+    image: antithesis-kafka-workload:java-latest
     container_name: workload
     volumes:
       - ./workload-config.json:/app/workload-config.json
+      - ./workload-config.yaml:/app/workload-config.yaml
     networks:
       - cluster-net
     depends_on:
       - kafka-1
       - kafka-2
       - kafka-3
+  workload-2:
+    image: antithesis-kafka-workload:java-latest
+    container_name: workload-2
+    volumes:
+      - ./workload-config.json:/app/workload-config.json
+      - ./workload-config.yaml:/app/workload-config.yaml
+    networks:
+      - cluster-net
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - workload
 
 networks:
   cluster-net:
