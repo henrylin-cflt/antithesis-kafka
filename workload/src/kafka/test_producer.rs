@@ -33,7 +33,8 @@ impl TestProducer {
         producer_config
             .set("client.id", id)
             .set("bootstrap.servers", &config.bootstrap_servers)
-            .set("message.timeout.ms", "0")
+            .set("message.timeout.ms", "1500")
+            .set("transaction.timeout.ms", "2000")
             .set("request.required.acks", "all")
             .set("enable.idempotence", "true");
 
@@ -53,7 +54,7 @@ impl TestProducer {
         // Initialize transactions only if enabled
         if config.enable_transactions {
             inner_producer
-                .init_transactions(Timeout::Never)
+                .init_transactions(Timeout::After(Duration::from_millis(1000)))
                 .context("failed to initialize transactions")?;
         }
         
@@ -189,7 +190,7 @@ impl TestProducer {
                 };
                 match self
                     .inner_producer
-                    .send(record, Timeout::Never)
+                    .send(record, Timeout::After(Duration::from_millis(1000)))
                     .await
                 {
                     Ok((partition, offset)) => {
@@ -220,7 +221,7 @@ impl TestProducer {
         let should_abort = rng::u64_in(1, 100) <= 30;
         
         if should_abort {
-            match self.inner_producer.abort_transaction(Timeout::Never) {
+            match self.inner_producer.abort_transaction(Timeout::After(Duration::from_millis(1000))) {
                 Ok(_) => {
                     warn!(
                         timestamp = chrono::Utc::now()
@@ -247,7 +248,7 @@ impl TestProducer {
                 }
             }
         } else {
-            match self.inner_producer.commit_transaction(Timeout::Never) {
+            match self.inner_producer.commit_transaction(Timeout::After(Duration::from_millis(1000))) {
                 Ok(_) => {
                     // Now that transaction is committed, log all messages as successfully written
                     for (partition, offset, payload, msg_key) in pending_messages {
@@ -324,7 +325,7 @@ impl TestProducer {
                 };
                 match self
                     .inner_producer
-                    .send(record, Timeout::Never)
+                    .send(record, Timeout::After(Duration::from_millis(1500)))
                     .await
                 {
                     Ok((partition, offset)) => {
